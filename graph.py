@@ -1,3 +1,4 @@
+# graph.py 
 import pandas as pd
 import base64
 import datetime
@@ -12,35 +13,16 @@ import numpy as np
 import networkx as nx
 import plotly.graph_objs as go
 
-from Math import *
+from sys import stderr
 
-p = 0
-IDLENESS = 0
-N = 0
-M = [[]]
-K = [[]]
-DARK = True
-CURVATURE = 'ollivier'
-WEIGHTS = 'unweighted'
-THRESHOLD = 0.5
-SELECTED = []
-N_CLICKS = None
-MATRIX = None
-TRACE_RECODE = []
-INITIAL = True
-GRAPH = None
-POS = None
-ADD_VERTEX = False
-DELETED = [0 for i in range(57)]
-X = None
-Y = None
+from Math import *
 
 def color(curv_value, Dark):
     if Dark:
         if curv_value < 0:
             return 'Aquamarine'
         elif curv_value == 0:
-            return 'WhiteSmoke'
+            return 'LightCyan'
         else:
             return 'Tomato'
     else:
@@ -79,18 +61,18 @@ class Node:
         if y:
             self.y = y
         self.trace = go.Scatter(x=[self.x], y=[self.y],
-                                hovertext=[],
                                 text=[],
                                 mode='markers+text',
                                 textposition="bottom center",
-                                hoverinfo="none",
-                                marker={'size': max(10, 100 * curvature),
+                                hoverinfo="text",
+                                hovertext='curvature=' + str(curvature),
+                                marker={'size': min(max(10, 100 * curvature), 100),
                                         'color': color(curvature, dark)},
                                 unselected={'marker': {'opacity': 1.0}})
         
-        self.trace['name'] = self.id
+        self.trace['name'] = int(self.id)
         if self.selected:
-            self.trace['marker']['color'] = color(curvature, (not DARK))
+            self.trace['marker']['color'] = color(curvature, (not dark))
             
 
 class Edge:
@@ -101,33 +83,41 @@ class Edge:
         self.trace = None
         self.middle_hover_trace = None
         
-    def draw(self, dark=False, curvature=0.0):
-        #weight = float(G.edges[edge]['curv']) 
+    def draw(self, dark=False, curvature=0.0, directed=False):
+        x0, y0 = self.from_node.x, self.from_node.y
+        x1, y1 = self.to_node.x, self.to_node.y
         self.trace = go.Scatter(x=tuple([x0, x1, None]),
                                 y=tuple([y0, y1, None]),
                                 mode='lines',
+                                hoverinfo='none',
                                 line={'width': 3},
-                                showgrid=False,
-                                showaxis=False,
-                                marker={'color': color(curvature, DARK)},
+                                marker={'color': color(curvature, dark)},
                                 line_shape='spline',
-                                opacity=1.0 if curvature == 0 else max(0.25, curvature))
+                                opacity=1.0 if curvature == 0 else min(1.0, max(0.25, curvature)))
+        
         self.middle_hover_trace = go.Scatter(x=tuple([(x0 + x1) / 2]),
                                              y=tuple([(y0 + y1) / 2]),
                                              hovertext=[],
                                              mode='markers',
                                              hoverinfo="text",
-                                             marker={'size': 20, 'color': color(curvature, DARK)},
-                                             opacity=0)                                    
-        middle_hover_trace['hovertext'] += tuple(['curvature = ' + str(curvature)])
-        middle_hover_trace['name'] = ''
-        edge_trace['name'] = '0'
+                                             marker={'size': 3, 'color': color(curvature, dark)},
+                                             opacity=1.0 if curvature == 0 else min(1.0, max(0.25, curvature)))
+        
+        #if directed or self.from_node.id > self.to_node.id:
+        self.middle_hover_trace['hovertext'] += tuple(['curvature=' + str(curvature) + ', weight=' + str(self.weight)])
+        self.middle_hover_trace['name'] = '0'
+        self.trace['name'] = '0'
         
         
 class Graph:
-    def __init__(self, nodes=[], edges=[], dark=False):
+    def __init__(self, nodes=None, edges=None, dark=False):
+        if nodes is None:
+            nodes = []
+        if edges is None:
+            edges = []
+
         self.M = np.zeros(shape=(len(nodes), len(nodes)))
-        
+        self.DM = np.zeros(shape=(len(nodes), len(nodes)))
         self.DG = nx.DiGraph()
         self.DG.add_nodes_from(nodes)
         self.G = nx.Graph()
@@ -140,17 +130,18 @@ class Graph:
         self.dpos = nx.circular_layout(self.DG)
         nx.set_node_attributes(self.DG, self.dpos, 'pos')
         
-        self.nodes = []
+        self.nodes = nodes
         for nd in nodes:
             node = Node(node_id=nd, x=nd['pos'][0], y=nd['pos'][1])
             self.nodes.append(node)
         
-        self.edges = edges
+        self.edges = dict()
         for e in edges:
             from_node = self.nodes[e[0]]
             to_node = self.nodes[e[1]]
-            self.add_edge(self, from_node, to_node)
-            M[from_node][to_node] = 0 if not e['weight'] else e['weight']
+            self.add_edge(self, from_node, to_node, e.weight)
+            M[from_node][to_node] = 0 if not e.weight else e.weight
+            DM[from_node][to_node] = 0 if not e.weight else e.weight
             
         self.trace_recode = []
         self.dark = dark
@@ -159,9 +150,23 @@ class Graph:
     def update_distances():
         pass
     
-    def compute_curvatures(self, curvature_type='ollivier'):
-        pass
-    
+    def compute_curvatures(self, curvature_type=None, weighted=False, idleness=None):
+        if len(self.nodes) < 1:
+            return
+        K = np.zeros(shape=self.M.shape, dtype=float)
+        
+        if curvature_type == 'idleness':
+            K = curvature_with_idleness(self.M, idleness=idleness)
+        elif curvature_type == 'forman':
+            K = forman(self.M)
+        elif curvature_type == 'lly':
+            K = curvature_lly(self.M)
+        elif curvature_type == 'directed':
+            K = curvature_dir(self.DM)
+        elif curvature_type == 'ollivier':
+            K = curvature(self.M)
+        return K
+
         
     def add_edge(self, from_node, to_node, weight=1.0, curvature=0.0):
         self.G.add_edge(from_node, to_node)
@@ -169,38 +174,83 @@ class Graph:
         
         from_node_ = self.nodes[from_node]
         to_node_ = self.nodes[to_node]
-        edge = Edge(from_node_, to_node_) #, weight, curvature)
+        edge = Edge(from_node_, to_node_, weight)
+        self.edges[from_node, to_node] = edge
+        self.M[from_node, to_node] = weight
+        self.M[to_node, from_node] = weight
+        self.DM[from_node, to_node] = weight
         from_node_.deg_out += 1
         from_node_.edges_out.append(edge)
         to_node_.deg_in += 1
         to_node_.edges_in.append(edge)
-        #self.edges[(from_node, to_node)] = edge
+        # if the graph is directed
         
-    def delete_edge(self, edge):
-        edge.from_node.deg_out -= 1
-        edge.from_node.edges_out.remove(edge)
-        edge.to_node.deg_in -= 1
-        edge.to_node.edges_in.remove(edge)  
+    def delete_edge_(self, edge, mode=1):
+        if mode:
+            edge.from_node.deg_out -= 1
+            if edge in edge.from_node.edges_out:
+                edge.from_node.edges_out.remove(edge)
+        else:
+            edge.to_node.deg_in -= 1
+            if edge in edge.to_node.edges_in:
+                edge.to_node.edges_in.remove(edge)
+        self.edges.pop((edge.from_node.id, edge.to_node.id), edge)
+        self.M[edge.from_node.id][edge.to_node.id] = 0.0
+        self.M[edge.to_node.id][edge.from_node.id] = 0.0
+        self.DM[edge.from_node.id][edge.to_node.id] = 0.0
+        self.DM[edge.to_node.id][edge.from_node.id] = 0.0
+        
         
     def delete_edge(self, from_node, to_node):
-        edge = self.edges[(from_node, to_node)]
-        from_node.deg_out -= 1
-        from_node.edges_out.remove(edge)
-        to_node.deg_in -= 1
-        to_node.edges_in.remove(edge)
+        if (from_node, to_node) not in self.edges:
+            return
+        if (from_node, to_node) in self.edges:
+            edge = self.edges[from_node, to_node]
+            self.nodes[from_node].deg_out -= 1
+            if edge in self.nodes[from_node].edges_out:
+                self.nodes[from_node].edges_out.remove(edge)
+            self.nodes[to_node].deg_in -= 1
+            if edge in self.nodes[to_node].edges_in:
+                self.nodes[to_node].edges_in.remove(edge)
+            self.edges.pop((from_node, to_node), edge)
+        if (to_node, from_node) in self.edges:
+            edge = self.edges[to_node, from_node]
+            self.nodes[to_node].deg_out -= 1
+            if edge in self.nodes[to_node].edges_out:
+                self.nodes[to_node].edges_out.remove(edge)
+            self.nodes[from_node].deg_in -= 1
+            if edge in self.nodes[from_node].edges_in:
+                self.nodes[from_node].edges_in.remove(edge)
+            self.edges.pop((to_node, from_node), edge)
+        self.M[from_node][to_node] = 0.0
+        self.M[to_node][from_node] = 0.0
+        self.DM[from_node][to_node] = 0.0
+        self.DM[to_node][from_node] = 0.0
     
-    def add_node(self, node_id='', x=None, y=None):
-        node_id = len(self.nodes)
-        node = Node(node_id=node_id, x=x, y=y)
+    def add_node(self, node_id=None, x=None, y=None, resize=True):
+        if node_id is None:
+            node_id = len(self.nodes)
+        if x:
+            node = Node(node_id=node_id, x=x, y=y)
+        else:
+            node = Node(node_id=node_id)
         self.nodes.append(node)
-        #resize M
+        if resize:
+            new_M = np.zeros((len(self.nodes), len(self.nodes)))
+            new_M[:-1, :-1] += self.M
+            self.M = new_M
+            new_DM = np.zeros((len(self.nodes), len(self.nodes)))
+            new_DM[:-1, :-1] += self.DM
+            self.DM = new_DM
+        self.G.add_node(node_id)
+        self.DG.add_node(node_id)
     
     def delete_node(self, node_id):
         node = self.nodes[node_id]
         for e in node.edges_in:
-            self.delete_edge(e)
+            self.delete_edge_(e)
         for e in node.edges_out:
-            self.delete_edge(e)
+            self.delete_edge_(e, mode=0)
         node.deleted = True
     
     def trace_recode_init(self):
@@ -211,40 +261,64 @@ class Graph:
             x.append(i)
         for i in range(-150, 150):
             y.append(np.array(x)) 
-        hm = go.Heatmap(x=x, y=x, z=np.array(y), opacity=0, showlegend=False, showscale=False)
+        hm = go.Heatmap(x=x, y=x, z=np.array(y), opacity=0, showlegend=False, showscale=False, hoverinfo='none')
         hm['name'] = 'HEATMAP'
         self.trace_recode.append(hm)
   
     
-    def draw(self, curvature_type='ollivier', layout='circular'):
+    def draw(self, curvature_type='ollivier', layout='circular', fixed_pos=True, directed=False, weighted=False, idleness=None):
         self.trace_recode_init()
         
-        self.pos = nx.circular_layout(self.G)
-        if layout=='spring':
-            self.pos = nx.spring_layout(self.G)
-        elif layout=='random':
-            self.pos = nx.random_layout(self.G)
-        elif layout=='planar':
-            self.pos = nx.planar_layout(self.G)
-        elif layout=='shell':
-            self.pos = nx.shell_layout(self.G)
-        elif layout=='spectral':
-            self.pos = nx.spectral_layout(self.G)
-
-        #nx.set_node_attributes(self.G, self.pos, 'pos')
+        if not directed:
+            self.pos = nx.circular_layout(self.G)
+            if layout=='spring':
+                self.pos = nx.spring_layout(self.G)
+            elif layout=='random':
+                self.pos = nx.random_layout(self.G, center=[0,0])
+            elif layout=='planar':
+                self.pos = nx.planar_layout(self.G)
+            elif layout=='shell':
+                self.pos = nx.shell_layout(self.G)
+            elif layout=='spectral':
+                self.pos = nx.spectral_layout(self.G)
+        else:
+            self.dpos = nx.circular_layout(self.DG)
+            if layout=='spring':
+                self.dpos = nx.spring_layout(self.DG)
+            elif layout=='random':
+                self.dpos = nx.random_layout(self.DG, center=[0,0])
+            elif layout=='planar':
+                self.dpos = nx.planar_layout(self.DG)
+            elif layout=='shell':
+                self.dpos = nx.shell_layout(self.DG)
+            elif layout=='spectral':
+                self.dpos = nx.spectral_layout(self.DG)
             
-        #K = self.compute_curvatures(curvature_type)
+        K = self.compute_curvatures(curvature_type=curvature_type, idleness=idleness)
+
         for n in self.nodes:
             if not n.deleted:
-                n.x = self.pos[n.id][0] * 100
-                n.y = self.pos[n.id][1] * 100
-                n.draw(n.x, n.y, self.dark)
-                self.trace_recode.append(n.trace)
-        
-        for e in self.edges:
-            e.draw(self.dark)
+                if not fixed_pos or not n.x or not n.y:
+                    if directed:
+                        n.x = self.dpos[n.id][0] * 100
+                        n.y = self.dpos[n.id][1] * 100
+                    else:
+                        n.x = self.pos[n.id][0] * 100
+                        n.y = self.pos[n.id][1] * 100
+
+        for index, e in self.edges.items():
+            e.draw(dark=self.dark, curvature=K[e.from_node.id][e.to_node.id], directed=directed)
             self.trace_recode.append(e.trace)
-            
+            self.trace_recode.append(e.middle_hover_trace)
+
+        for n in self.nodes:
+            if not n.deleted:
+                if directed:
+                    n.draw(x=n.x, y=n.y, dark=self.dark, curvature=node_curvature(self.DM, K, n.id, weighted))
+                    self.trace_recode.append(n.trace)
+                else:
+                    n.draw(x=n.x, y=n.y, dark=self.dark, curvature=node_curvature(self.M, K, n.id, weighted))
+                    self.trace_recode.append(n.trace)
 
         figure = {
             "data": self.trace_recode,
@@ -252,11 +326,25 @@ class Graph:
                       'showlegend': False,
                       'hovermode': 'closest', 
                       'margin': {'b': 40, 'l': 40, 'r': 40, 't': 40},
-                      'xaxis': {'showgrid': False, 'zeroline': False, 'showticklabels': False},
-                      'yaxis': {'showgrid': False, 'zeroline': False, 'showticklabels': False},
+                      'xaxis': {'showgrid': False, 'zeroline': False, 'showticklabels': False, 'tickvals':[]},
+                      'yaxis': {'showgrid': False, 'zeroline': False, 'showticklabels': False, 'tickvals':[]},
                       'height': 600,
+                      #'paper_bgcolor': plotcolor(self.dark),
                       'plot_bgcolor': plotcolor(self.dark),
-                      'clickmode': 'event+select'
+                      'clickmode': 'event+select',
+                      'annotations': [dict(
+                                        ax=(edge.from_node.x + edge.to_node.x) / 2,
+                                        ay=(edge.from_node.y + edge.to_node.y) / 2, axref='x', ayref='y',
+                                        x=(edge.to_node.x * 3 + edge.from_node.x) / 4,
+                                        y=(edge.to_node.y * 3 + edge.from_node.y) / 4, xref='x', yref='y',
+                                        showarrow=True,
+                                        arrowhead=3,
+                                        arrowsize=3,
+                                        arrowwidth=1,
+                                        opacity=edge.trace.opacity * int(directed),
+                                        arrowcolor='white'
+                                    ) for edge in self.edges.values()]
                       }
         }
+    
         return figure
