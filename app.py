@@ -37,7 +37,7 @@ external_scripts = ["https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJa
 app = dash.Dash(__name__,
                 external_stylesheets=external_stylesheets,
                 external_scripts=external_scripts)
-#server = app.server
+server = app.server
 app.title = "Curvature Calculator"
 
 
