@@ -207,6 +207,7 @@ def change_layout(clickData,
     if curvature_type == 'directed':
         return G.draw(layout=layout_type, curvature_type=curvature_type, directed=True, weighted=weighted)
     
+    print(G.M)
     return G.draw(layout=layout_type, curvature_type=curvature_type, weighted=weighted, idleness=idleness)
 
 
