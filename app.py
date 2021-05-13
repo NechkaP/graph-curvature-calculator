@@ -102,15 +102,16 @@ def change_layout(clickData,
                 idleness = None
         else:
             idleness = None
+            
+    if color != None and 'D' in color:
+        G.dark = True
+    else:
+        G.dark = False
         
     if 'layout-type' in changed_id:
         return G.draw(layout=layout_type, curvature_type=curvature_type, fixed_pos=False, weighted=weighted, idleness=idleness)
     
-    if 'colortheme' in changed_id:
-        if color != None and 'D' in color:
-            G.dark = True
-        else:
-            G.dark = False
+    #if 'colortheme' in changed_id:
     
     elif 'my-graph' in changed_id:
         G.trace_recode_init()
