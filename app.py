@@ -113,7 +113,7 @@ def change_layout(clickData,
     
     #if 'colortheme' in changed_id:
     
-    elif 'my-graph' in changed_id:
+    if 'my-graph' in changed_id:
         G.trace_recode_init()
         G.selected = []
         for n in G.nodes:
