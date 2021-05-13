@@ -209,24 +209,24 @@ def change_layout(clickData,
     return G.draw(layout=layout_type, curvature_type=curvature_type, weighted=weighted, idleness=idleness)
 
 
-@app.callback(
-    Output('colortheme', 'value'),
-    Input('my-graph', 'clickData'),
-    [State('colortheme', 'value'),
-    State('my-graph', 'figure')]
-    )
-def click_processing(clickData, colorth, figure):
-    if clickData is None or clickData['points'] == []:
-        return colorth
-    curve = clickData['points'][0]['curveNumber']
-    name = figure['data'][curve]['name']
-    if name == 'HEATMAP':
-        global last_click
-        last_click.x = int(clickData['points'][0]['x'])
-        last_click.y = int(clickData['points'][0]['y'])
-        global G
-        G.selected = []
-    return colorth
+#@app.callback(
+#    Output('colortheme', 'value'),
+#    Input('my-graph', 'clickData'),
+#    [State('colortheme', 'value'),
+#    State('my-graph', 'figure')]
+#    )
+#def click_processing(clickData, colorth, figure):
+#    if clickData is None or clickData['points'] == []:
+#        return colorth
+#    curve = clickData['points'][0]['curveNumber']
+#    name = figure['data'][curve]['name']
+#    if name == 'HEATMAP':
+#        global last_click
+#        last_click.x = int(clickData['points'][0]['x'])
+#        last_click.y = int(clickData['points'][0]['y'])
+#        global G
+#        G.selected = []
+#    return colorth
 
 
 @app.callback(
