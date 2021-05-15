@@ -18,9 +18,9 @@ import numpy as np
 import networkx as nx
 
 import plotly.graph_objs as go
-from index import *
-from graph import *
 from Math import *
+from graph import *
+from index import *
 
 #G = Graph()
 initial = True
@@ -101,7 +101,6 @@ def modify_graph(clickData,
                 filename,
                 is_fixed=True):
     changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
-<<<<<<< HEAD
     print(changed_id, ' changed of type ', type(changed_id) )
     global initial
     if not initial:
@@ -118,33 +117,6 @@ def modify_graph(clickData,
             G.dark = False
             
     elif 'my-graph' in changed_id:
-=======
-    global G
-    weighted = (weighted_mode == 'weighted')
-    if 'idleness' in changed_id:
-        global idleness
-        if idleness_input:
-            try:
-                idleness = float(idleness_input)
-                if idleness < 0.0 or idleness > 1.0:
-                    idleness = None
-            except:
-                idleness = None
-        else:
-            idleness = None
-            
-    if color != None and 'D' in color:
-        G.dark = True
-    else:
-        G.dark = False
-        
-    if 'layout-type' in changed_id:
-        return G.draw(layout=layout_type, curvature_type=curvature_type, fixed_pos=False, weighted=weighted, idleness=idleness)
-    
-    #if 'colortheme' in changed_id:
-    
-    if 'my-graph' in changed_id:
->>>>>>> d6edb7170648e9ccba5a61c48d7c48e53a01d2c6
         G.trace_recode_init()
         G.selected = []
         for n in G.nodes:
@@ -322,17 +294,12 @@ def change_layout(#clickData,
                       directed=True,
                       weighted=weighted)
     
-<<<<<<< HEAD
     return G.draw(layout=layout_type,
                   curvature_type=curvature_type,
                   fixed_pos=is_fixed_pos,
                   weighted=weighted,
                   idleness=idleness)
 
-=======
-    print(G.M)
-    return G.draw(layout=layout_type, curvature_type=curvature_type, weighted=weighted, idleness=idleness)
->>>>>>> d6edb7170648e9ccba5a61c48d7c48e53a01d2c6
 
 @app.callback(
     Output('clear-all-button', 'children'),
@@ -344,7 +311,6 @@ def confirm_delete(submit_n_clicks):
     return submit_n_clicks
     
 
-<<<<<<< HEAD
 @app.callback(
     Output('last-click', 'data'),
     Input('my-graph', 'clickData'),
@@ -359,26 +325,6 @@ def click_processing(clickData, figure):
         lc = LastClick(x=int(clickData['points'][0]['x']),
                        y=int(clickData['points'][0]['y']))
     return lc.serialize()
-=======
-#@app.callback(
-#    Output('colortheme', 'value'),
-#    Input('my-graph', 'clickData'),
-#    [State('colortheme', 'value'),
-#    State('my-graph', 'figure')]
-#    )
-#def click_processing(clickData, colorth, figure):
-#    if clickData is None or clickData['points'] == []:
-#        return colorth
-#    curve = clickData['points'][0]['curveNumber']
-#    name = figure['data'][curve]['name']
-#    if name == 'HEATMAP':
-#        global last_click
-#        last_click.x = int(clickData['points'][0]['x'])
-#        last_click.y = int(clickData['points'][0]['y'])
-#        global G
-#        G.selected = []
-#    return colorth
->>>>>>> d6edb7170648e9ccba5a61c48d7c48e53a01d2c6
 
 
 @app.callback(
