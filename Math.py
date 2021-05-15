@@ -1,6 +1,9 @@
 # Math.py
 import numpy as np
 from scipy.optimize import linprog
+from sklearn.preprocessing import MinMaxScaler
+
+min_max_scaler = MinMaxScaler()
 
 # функция для подсчета расстояния Вассерштейна
 def W1(M, N, m, d, i, j):

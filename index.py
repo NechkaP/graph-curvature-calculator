@@ -47,6 +47,10 @@ Data about graphs, which can be calculated using it, can be used in data analysi
 HELP_ABOUT = convert(MARKDOWN_DESCRIPTION)
 
 LAYOUT = html.Div([
+    dcc.Store(id='graph-store', storage_type='session'),
+    dcc.Store(id='last-click', storage_type='session'),
+    dcc.Store(id='idleness-store', storage_type='session'),
+    dcc.Store(id='is-fixed-pos', storage_type='session'),
     dcc.Tabs([
         dcc.Tab(label='Graph curvature calculator', children=[
             html.Div(children=[

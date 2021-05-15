@@ -13,7 +13,7 @@ import numpy as np
 import networkx as nx
 import plotly.graph_objs as go
 
-from sys import stderr
+from sys import stderr, modules
 
 from Math import *
 
@@ -41,19 +41,20 @@ def plotcolor(Dark):
     
 
 class Node:
-    def __init__(self, node_id='', x=None, y=None):
+    def __init__(self, node_id='', x=None, y=None, **kwargs):
+        self.name = self.__class__.__name__
         #if not x:
         #    x, y = G.nodes[node_id]['pos'] * 100
         self.x = 0 if not x else x
         self.y = 0 if not y else y
-        self.id = node_id
-        self.deg_in = 0
-        self.deg_out = 0
+        self.id = kwargs['id'] if 'id' in kwargs else node_id
+        self.deg_in = kwargs['deg_in'] if 'deg_in' in kwargs else 0
+        self.deg_out = kwargs['deg_out'] if 'deg_out' in kwargs else 0
         self.trace = None
-        self.selected = False
-        self.edges_in = []
-        self.edges_out = []
-        self.deleted = False
+        self.selected = kwargs['selected'] if 'selected' in kwargs else False
+        self.edges_in = kwargs['edges_in'] if 'edges_in' in kwargs else []
+        self.edges_out = kwargs['edges_out'] if 'edges_out' in kwargs else []
+        self.deleted = kwargs['deleted'] if 'deleted' in kwargs else False
     
     def draw(self, dark=False, curvature=0.0, x=None, y=None):
         if x:
@@ -110,42 +111,76 @@ class Edge:
         
         
 class Graph:
-    def __init__(self, nodes=None, edges=None, dark=False):
+    def __init__(self, nodes=None, edges=None, **kwargs):
+        self.name = self.__class__.__name__
         if nodes is None:
             nodes = []
         if edges is None:
             edges = []
-
-        self.M = np.zeros(shape=(len(nodes), len(nodes)))
-        self.DM = np.zeros(shape=(len(nodes), len(nodes)))
-        self.DG = nx.DiGraph()
-        self.DG.add_nodes_from(nodes)
-        self.G = nx.Graph()
-        self.G.add_nodes_from(nodes)
-        self.G.add_edges_from(edges)
-        self.DG.add_edges_from(edges)
         
-        self.pos = nx.circular_layout(self.G)
+        if 'M' in kwargs:
+            self.M = kwargs['M']
+        else:
+            self.M = np.zeros(shape=(len(nodes), len(nodes)))
+        
+        if 'DM' in kwargs:
+            self.DM = kwargs['DM']
+        else:
+            self.DM = np.zeros(shape=(len(nodes), len(nodes)))
+            
+        if 'DG' in kwargs:
+            self.DG = kwargs['DG']
+        else:
+            self.DG = nx.DiGraph()
+            self.DG.add_nodes_from(nodes)
+            self.DG.add_edges_from(edges)
+        
+        if 'G' in kwargs:
+            self.G = kwargs['G']
+        else:
+            self.G = nx.Graph()
+            self.G.add_nodes_from(nodes)
+            self.G.add_edges_from(edges)
+        
+        if 'pos' in kwargs:
+            self.pos = kwargs['pos']
+        else:
+            self.pos = nx.circular_layout(self.G)
         nx.set_node_attributes(self.G, self.pos, 'pos')
-        self.dpos = nx.circular_layout(self.DG)
+        if 'dpos' in kwargs:
+            self.dpos = kwargs['dpos']
+        else:
+            self.dpos = nx.circular_layout(self.DG)
         nx.set_node_attributes(self.DG, self.dpos, 'pos')
         
         self.nodes = nodes
+        
+        pos = nx.circular_layout(self.G)
         for nd in nodes:
-            node = Node(node_id=nd, x=nd['pos'][0], y=nd['pos'][1])
-            self.nodes.append(node)
+            if nd.id in self.pos.keys():
+                nd.x=self.pos[nd.id][0]
+                nd.y=self.pos[nd.id][1]
+            else:
+                nd.x=pos[nd.id][0]
+                nd.y=pos[nd.id][1]
+            #self.nodes.append(node)
         
         self.edges = dict()
-        for e in edges:
-            from_node = self.nodes[e[0]]
-            to_node = self.nodes[e[1]]
-            self.add_edge(self, from_node, to_node, e.weight)
-            M[from_node][to_node] = 0 if not e.weight else e.weight
-            DM[from_node][to_node] = 0 if not e.weight else e.weight
+        for u in range(self.M.shape[0]):
+            for v in range(self.M.shape[0]):
+                if self.DM[u, v]:
+                    self.add_edge(u, v, self.DM[u, v])
             
         self.trace_recode = []
-        self.dark = dark
-        self.selected = []
+        if 'dark' in kwargs:
+            self.dark = kwargs['dark']
+        else:
+            self.dark = False
+            
+        if 'selected' in kwargs:
+            self.selected = kwargs['selected']
+        else:
+            self.selected = []
         
     def update_distances():
         pass
@@ -264,6 +299,7 @@ class Graph:
         hm = go.Heatmap(x=x, y=x, z=np.array(y), opacity=0, showlegend=False, showscale=False, hoverinfo='none')
         hm['name'] = 'HEATMAP'
         self.trace_recode.append(hm)
+        print('heatmap here')
   
     
     def draw(self, curvature_type='ollivier', layout='circular', fixed_pos=True, directed=False, weighted=False, idleness=None):
@@ -348,3 +384,51 @@ class Graph:
         }
     
         return figure
+
+
+class MyJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        #print(type(obj))
+        if isinstance(obj, Graph):
+            print('Encoding graph', obj)
+            #obj.__dict__.pop('pos', None)
+            #obj.__dict__.pop('dpos', None)
+            obj.__dict__.pop('edges', None)
+            obj.__dict__.pop('trace_recode', None)
+            #print('bonjour', obj.__dict__)
+            return obj.__dict__
+        elif isinstance(obj, Node):
+            obj.__dict__.pop('edges_in', None)
+            obj.__dict__.pop('edges_out', None)
+            obj.__dict__.pop('trace', None)
+            print('node ', obj.__dict__)
+            return obj.__dict__
+        elif isinstance(obj, nx.Graph):
+            return {'name': 'nx.Graph', 'data': nx.adjacency_data(obj)}
+        elif isinstance(obj, nx.DiGraph):
+            return {'name': 'nx.DiGraph', 'data': nx.adjacency_data(obj)}
+        elif isinstance(obj, np.ndarray):
+            return {'name': 'np.array', 'data': obj.tolist()}
+        elif isinstance(obj, list):
+            print('list', obj)
+            return [MyJSONEncoder.default(self, x) for x in obj]
+        else:
+            return json.JSONEncoder.default(self, obj)
+
+
+def MyJSONDecode(dct):
+    #print('dct', dct)
+    if isinstance(dct, dict) and 'name' in dct:
+        name = dct['name']
+        if name == 'Graph':
+            print('decoding graph', dct)
+        dct.pop('name', None)
+        if name == 'nx.Graph':
+            return nx.adjacency_graph(dct['data'], directed=False)
+        elif name == 'nx.DiGraph':
+            return nx.adjacency_graph(dct['data'], directed=True)
+        elif name == 'np.array':
+            return np.array(dct['data'])
+        else:
+            return getattr(modules[__name__], name)(**dct)
+    return dct
