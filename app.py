@@ -18,6 +18,9 @@ import numpy as np
 import networkx as nx
 
 import plotly.graph_objs as go
+from graph import *
+from Math import *
+from index import *
 
 
 class LastClick:

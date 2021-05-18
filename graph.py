@@ -15,7 +15,7 @@ import plotly.graph_objs as go
 
 from sys import stderr, modules
 
-#from Math import *
+from Math import *
 
 def color(curv_value, Dark):
     if Dark:
