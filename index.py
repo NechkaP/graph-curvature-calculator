@@ -51,6 +51,7 @@ LAYOUT = html.Div([
     dcc.Store(id='last-click', storage_type='session'),
     dcc.Store(id='idleness-store', storage_type='session'),
     dcc.Store(id='is-fixed-pos', storage_type='session'),
+    dcc.Store(id='initial', storage_type='session'),
     dcc.Tabs([
         dcc.Tab(label='Graph curvature calculator', children=[
             html.Div(children=[
@@ -107,6 +108,24 @@ LAYOUT = html.Div([
                                                          disabled=True,
                                             style={'height':'240px', 'width':'180px', 'margin':'5px', 'float':'left'}
                                             ),
+                                        ),
+                                        html.Div(children=[
+                                                html.Button("Export as CSV", id="btn_csv",
+                                                           style={'width':'180px', 'margin':'5px', 'float':'left'}),
+                                                dcc.Download(id="download-csv")
+                                            ]
+                                        ),
+                                        html.Div(children=[
+                                                html.Button("Export graph", id="btn_graph",
+                                                           style={'width':'180px', 'margin':'5px', 'float':'left'}),
+                                                dcc.Download(id="download-graph")
+                                            ],
+                                        ),
+                                        html.Div(children=[
+                                                html.Button("Export adj.matrix", id="btn_adj",
+                                                           style={'width':'180px', 'margin':'5px', 'float':'left'}),
+                                                dcc.Download(id="download-adj")
+                                            ],
                                         )
                                     ]
                                 )

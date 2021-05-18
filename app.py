@@ -18,13 +18,7 @@ import numpy as np
 import networkx as nx
 
 import plotly.graph_objs as go
-from Math import *
-from graph import *
-from index import *
 
-#G = Graph()
-initial = True
-initial2 = True
 
 class LastClick:
     def __init__(self, x=None, y=None):
@@ -48,21 +42,25 @@ app = dash.Dash(__name__,
                 external_scripts=external_scripts)
 server = app.server
 app.title = "Curvature Calculator"
-
-
 app.layout = LAYOUT
+
+
+    #return '{"name": "Graph", "M": {"name": "np.array", "data": []}, "DM": {"name": "np.array", "data": []}, "DG": {"name": "nx.Graph", "data": {"directed": true, "multigraph": false, "graph": [], "nodes": [], "adjacency": []}}, "G": {"name": "nx.Graph", "data": {"directed": false, "multigraph": false, "graph": [], "nodes": [], "adjacency": []}}, "pos": {}, "dpos": {}, "nodes": [], "dark": false, "selected": []}'
+
 
 
 # all changes that affect the graph directly
 @app.callback(
     [Output('graph-store', 'data'),
-     Output('is-fixed-pos', 'data')
+     Output('my-graph', 'figure'),
+     Output('is-fixed-pos', 'data'),
+     Output('initial', 'data')
     ],
     [Input('my-graph', 'selectedData'),
-    #Input('layout-type', 'value'),
+    Input('layout-type', 'value'),
     Input('colortheme', 'value'),
     Input('matrix-input', 'value'),
-    #Input('curvature-type', 'value'),
+    Input('curvature-type', 'value'),
     Input('edge-button', 'n_clicks'),
     Input('edge-weight', 'value'),
     Input('edge-delete-button', 'n_clicks'),
@@ -70,22 +68,23 @@ app.layout = LAYOUT
     Input('vertex-delete-button', 'n_clicks'),
     Input('clear-all-button', 'children'),
     Input('upload-data', 'contents'),
-    #Input('weighted-mode', 'value'),
-    #Input('last-click', 'data'),
-    #Input('idleness-store', 'data')
+    Input('weighted-mode', 'value'),
+    Input('idleness-store', 'data')
     ],
     [
     State('graph-store', 'data'), 
     State('last-click', 'data'),
     State('my-graph', 'figure'),
     State('upload-data', 'filename'),
-    State('is-fixed-pos', 'data')]
+    State('initial', 'data'),
+    #State('is-fixed-pos', 'data')
+    ]
 )
 def modify_graph(clickData,
-                #layout_type,
+                layout_type,
                 color,
                 matrix,
-                #curvature_type,
+                curvature_type,
                 n_clicks,
                 edge_weight, 
                 n_clicks_delete,
@@ -93,24 +92,48 @@ def modify_graph(clickData,
                 n_clicks_v_delete,
                 n_clicks_clear,
                 contents,
-                #weighted_mode,
+                weighted_mode,
+                idleness,
                 graph_state,
                 last_click,
-                #idleness,
                 figure, 
                 filename,
-                is_fixed=True):
-    changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
-    print(changed_id, ' changed of type ', type(changed_id) )
-    global initial
-    if not initial:
-        G = json.loads(graph_state, object_hook=MyJSONDecode)
-    else:
-        initial = False
-        #print('no graph', graph_state)
-        G = Graph()
+                not_initial,
+                #is_fixed_output='True'
+                ):
     
-    if 'colortheme' in changed_id:
+    if not not_initial:
+        G = Graph()
+        my_graph_output = G.draw(layout=layout_type,
+                          curvature_type=None,
+                          fixed_pos=True,
+                          weighted=False)
+        return [json.dumps(G, cls=MyJSONEncoder),
+                my_graph_output,
+                'True',
+                'not initial']
+    graph_store_output = graph_state
+    my_graph_output = figure
+    #is_fixed = (is_fixed_output == 'True')
+    
+    changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
+    weighted = (weighted_mode == 'weighted')
+    
+    try:
+        G = json.loads(graph_state, object_hook=MyJSONDecode)
+    except:
+        G = Graph()
+
+        
+    if 'layout-type' in changed_id:
+        my_graph_output = G.draw(layout=layout_type,
+                          curvature_type=curvature_type,
+                          fixed_pos=False,
+                          weighted=weighted,
+                          idleness=idleness)
+        return [graph_store_output, my_graph_output, 'False', 'not initial']
+    
+    elif 'colortheme' in changed_id:
         if color != None and 'D' in color:
             G.dark = True
         else:
@@ -163,22 +186,13 @@ def modify_graph(clickData,
         except:
             pass
         if lc.x:
-            print('adding node 1')
-            print('nodes before', len(G.nodes))
-            G.add_node()
-            print('nodes after', len(G.nodes))
+            G.add_node(x=lc.x, y=lc.y)
             lc.x = None
             lc.y = None
         else:
-            print('adding node 2')
-            print('nodes before', len(G.nodes))
             G.add_node()
-            print('nodes after', len(G.nodes))
-
-            #serialized = json.dumps(G, cls=MyJSONEncoder)
-            #return [serialized, False]
-            #return G.draw(layout=layout_type, curvature_type=curvature_type, fixed_pos=False, weighted=weighted, idleness=idleness)
-        
+        print(G.nodes[-1])
+            
     elif 'vertex-delete-button' in changed_id:
         if len(G.selected) > 0:
             index = int(G.selected[-1])
@@ -222,88 +236,20 @@ def modify_graph(clickData,
             # Assume that the user uploaded a CSV file
             #df = pd.read_csv(
             #    io.StringIO(decoded.decode('utf-8')))
-    serialized = json.dumps(G, cls=MyJSONEncoder)
-    return [serialized, is_fixed]
+    graph_store_output = json.dumps(G, cls=MyJSONEncoder)
+    my_graph_output = G.draw(layout=layout_type,
+                          curvature_type=curvature_type,
+                          fixed_pos=True,
+                          weighted=weighted,
+                          idleness=idleness)
+    
+    return [graph_store_output, my_graph_output, 'True', 'not initial']
             
-
-# changes that do not affect graph itself but force us to redraw it
-@app.callback(
-    Output('my-graph', 'figure'),
-    [#Input('my-graph', 'selectedData'),
-    Input('layout-type', 'value'),
-    #Input('colortheme', 'value'),
-    #Input('matrix-input', 'value'),
-    Input('curvature-type', 'value'),
-    #Input('edge-button', 'n_clicks'),
-    #Input('edge-weight', 'value'),
-    #Input('edge-delete-button', 'n_clicks'),
-    #Input('vertex-button', 'n_clicks'),
-    #Input('vertex-delete-button', 'n_clicks'),
-    #Input('clear-all-button', 'children'),
-    #Input('upload-data', 'contents'),
-    Input('weighted-mode', 'value'),
-    #Input('last-click', 'data'),
-    Input('idleness-store', 'data'),
-    Input('graph-store', 'data')
-    ],
-    [State('my-graph', 'figure'),
-    #State('upload-data', 'filename')
-    State('is-fixed-pos', 'data')
-    ])
-def change_layout(#clickData,
-                  layout_type,
-                  #color,
-                  #matrix,
-                  curvature_type,
-                  #n_clicks,
-                  #edge_weight, 
-                  #n_clicks_delete,
-                  #n_clicks_v,
-                  #n_clicks_v_delete,
-                  #n_clicks_clear,
-                  #contents,
-                  weighted_mode,
-                  #last_click,
-                  idleness,
-                  graph_state,
-                  figure, 
-                  #filename,
-                  is_fixed_pos
-                  ):
-    changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
-    global initial2
-    if not initial2:
-        G = json.loads(graph_state, object_hook=MyJSONDecode)
-    else:
-        initial2 = False
-        #print('no graph', graph_state)
-        G = Graph()
-    weighted = (weighted_mode == 'weighted')
-        
-    if 'layout-type' in changed_id:
-        return G.draw(layout=layout_type,
-                      curvature_type=curvature_type,
-                      fixed_pos=False,
-                      weighted=weighted,
-                      idleness=idleness)  
-    
-    if curvature_type == 'directed':
-        return G.draw(layout=layout_type,
-                      curvature_type=curvature_type,
-                      fixed_pos=is_fixed_pos,
-                      directed=True,
-                      weighted=weighted)
-    
-    return G.draw(layout=layout_type,
-                  curvature_type=curvature_type,
-                  fixed_pos=is_fixed_pos,
-                  weighted=weighted,
-                  idleness=idleness)
-
 
 @app.callback(
     Output('clear-all-button', 'children'),
-    Input('confirm-delete-provider', 'submit_n_clicks')
+    Input('confirm-delete-provider', 'submit_n_clicks'),
+    prevent_initial_call=True
 )
 def confirm_delete(submit_n_clicks):
     if not submit_n_clicks:
@@ -314,7 +260,8 @@ def confirm_delete(submit_n_clicks):
 @app.callback(
     Output('last-click', 'data'),
     Input('my-graph', 'clickData'),
-    State('my-graph', 'figure')
+    State('my-graph', 'figure'),
+    prevent_initial_call=True
     )
 def click_processing(clickData, figure):
     if clickData is None or clickData['points'] == []:
@@ -324,6 +271,9 @@ def click_processing(clickData, figure):
     if name == 'HEATMAP':
         lc = LastClick(x=int(clickData['points'][0]['x']),
                        y=int(clickData['points'][0]['y']))
+    else:
+        lc = LastClick()
+    print(lc.serialize())
     return lc.serialize()
 
 
@@ -331,7 +281,8 @@ def click_processing(clickData, figure):
     [Output('matrix-input', 'value'),
      Output('edge-weight', 'value'),
      Output('idleness', 'value')],
-    Input('clear-all-button', 'children')
+    Input('clear-all-button', 'children'),
+    prevent_initial_call=True
 )
 def clear_input(n_clicks):
     return ['', '', '']
@@ -343,7 +294,8 @@ def clear_input(n_clicks):
     [Input('edge-weight', 'value'),
     Input('idleness', 'value'),
     Input('matrix-input', 'value')],
-    State('idleness-store', 'data')
+    State('idleness-store', 'data'),
+    prevent_initial_call=True
 )
 def validate_and_display_warning(edge_weight, idleness_input, matrix, cur_idleness):
     idleness = cur_idleness
@@ -373,6 +325,51 @@ def validate_and_display_warning(edge_weight, idleness_input, matrix, cur_idlene
                     pass
     
     return [warning, idleness]
+
+
+@app.callback(
+    Output("download-csv", "data"),
+    Input("btn_csv", "n_clicks"),
+    [State('graph-store', 'data'),
+     State('curvature-type', 'value'),
+     State('idleness', 'value')],
+    prevent_initial_call=True
+)
+def get_csv(n_clicks, graph, curvature, idleness):
+    G = Graph()
+    try:
+        G = json.loads(graph, object_hook=MyJSONDecode)
+    except:
+        pass
+    return dict(content=str(G.compute_curvatures(curvature_type=curvature, idleness=idleness)), filename="curvature.txt")
+
+
+@app.callback(
+    Output("download-graph", "data"),
+    Input("btn_graph", "n_clicks"),
+    State('graph-store', 'data'),
+    prevent_initial_call=True
+)
+def get_graph(n_clicks, graph):
+    try:
+        return dict(content=graph, filename="graph.json")
+    except:
+        return dict(content='', filename="graph.json")
+
+
+@app.callback(
+    Output("download-adj", "data"),
+    Input("btn_adj", "n_clicks"),
+    State('graph-store', 'data'),
+    prevent_initial_call=True
+)
+def get_graph(n_clicks, graph):
+    G = Graph()
+    try:
+        G = json.loads(graph, object_hook=MyJSONDecode)
+    except:
+        pass
+    return dict(content=str(G.M), filename="graph.csv")
 
 
 if __name__ == '__main__':

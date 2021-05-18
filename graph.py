@@ -15,7 +15,7 @@ import plotly.graph_objs as go
 
 from sys import stderr, modules
 
-from Math import *
+#from Math import *
 
 def color(curv_value, Dark):
     if Dark:
@@ -113,6 +113,7 @@ class Edge:
 class Graph:
     def __init__(self, nodes=None, edges=None, **kwargs):
         self.name = self.__class__.__name__
+        
         if nodes is None:
             nodes = []
         if edges is None:
@@ -156,15 +157,15 @@ class Graph:
         self.nodes = nodes
         
         pos = nx.circular_layout(self.G)
+        print('POSITION', self.pos)
         for nd in nodes:
             if nd.id in self.pos.keys():
-                nd.x=self.pos[nd.id][0]
-                nd.y=self.pos[nd.id][1]
+                nd.x = self.pos[nd.id][0] * 100
+                nd.y = self.pos[nd.id][1] * 100
             else:
-                nd.x=pos[nd.id][0]
-                nd.y=pos[nd.id][1]
-            #self.nodes.append(node)
-        
+                nd.x = pos[nd.id][0] * 100
+                nd.y = pos[nd.id][1] * 100
+                
         self.edges = dict()
         for u in range(self.M.shape[0]):
             for v in range(self.M.shape[0]):
@@ -299,10 +300,10 @@ class Graph:
         hm = go.Heatmap(x=x, y=x, z=np.array(y), opacity=0, showlegend=False, showscale=False, hoverinfo='none')
         hm['name'] = 'HEATMAP'
         self.trace_recode.append(hm)
-        print('heatmap here')
   
     
     def draw(self, curvature_type='ollivier', layout='circular', fixed_pos=True, directed=False, weighted=False, idleness=None):
+        print('Is fixed pos?', fixed_pos)
         self.trace_recode_init()
         
         if not directed:
@@ -341,7 +342,10 @@ class Graph:
                     else:
                         n.x = self.pos[n.id][0] * 100
                         n.y = self.pos[n.id][1] * 100
+                else:
+                    print(n.__dict__)
 
+        
         for index, e in self.edges.items():
             e.draw(dark=self.dark, curvature=K[e.from_node.id][e.to_node.id], directed=directed)
             self.trace_recode.append(e.trace)
@@ -365,7 +369,6 @@ class Graph:
                       'xaxis': {'showgrid': False, 'zeroline': False, 'showticklabels': False, 'tickvals':[]},
                       'yaxis': {'showgrid': False, 'zeroline': False, 'showticklabels': False, 'tickvals':[]},
                       'height': 600,
-                      #'paper_bgcolor': plotcolor(self.dark),
                       'plot_bgcolor': plotcolor(self.dark),
                       'clickmode': 'event+select',
                       'annotations': [dict(
@@ -388,20 +391,16 @@ class Graph:
 
 class MyJSONEncoder(json.JSONEncoder):
     def default(self, obj):
-        #print(type(obj))
         if isinstance(obj, Graph):
-            print('Encoding graph', obj)
-            #obj.__dict__.pop('pos', None)
-            #obj.__dict__.pop('dpos', None)
-            obj.__dict__.pop('edges', None)
-            obj.__dict__.pop('trace_recode', None)
-            #print('bonjour', obj.__dict__)
-            return obj.__dict__
+            dct = obj.__dict__.copy()
+            dct.pop('edges', None)
+            dct.pop('trace_recode', None)
+            print('GRAPH ENCODE', dct)
+            return dct
         elif isinstance(obj, Node):
             obj.__dict__.pop('edges_in', None)
             obj.__dict__.pop('edges_out', None)
             obj.__dict__.pop('trace', None)
-            print('node ', obj.__dict__)
             return obj.__dict__
         elif isinstance(obj, nx.Graph):
             return {'name': 'nx.Graph', 'data': nx.adjacency_data(obj)}
@@ -410,18 +409,16 @@ class MyJSONEncoder(json.JSONEncoder):
         elif isinstance(obj, np.ndarray):
             return {'name': 'np.array', 'data': obj.tolist()}
         elif isinstance(obj, list):
-            print('list', obj)
             return [MyJSONEncoder.default(self, x) for x in obj]
         else:
             return json.JSONEncoder.default(self, obj)
 
 
 def MyJSONDecode(dct):
-    #print('dct', dct)
     if isinstance(dct, dict) and 'name' in dct:
         name = dct['name']
-        if name == 'Graph':
-            print('decoding graph', dct)
+        #if name == 'Graph':
+        #    print('decoding graph', dct)
         dct.pop('name', None)
         if name == 'nx.Graph':
             return nx.adjacency_graph(dct['data'], directed=False)
