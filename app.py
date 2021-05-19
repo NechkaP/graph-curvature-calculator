@@ -1,4 +1,8 @@
-#app.py
+
+from graph import *
+from Math import *
+from index import *
+from serialize import *
 
 import dash
 from dash.dependencies import Input, Output, State
@@ -18,10 +22,6 @@ import numpy as np
 import networkx as nx
 
 import plotly.graph_objs as go
-from graph import *
-from Math import *
-from index import *
-from serialize import *
 
 
 class LastClick:
@@ -107,11 +107,6 @@ def modify_graph(clickData,
                 ):
     
     lc = LastClick()
-    try:
-        lc.deserialize(last_click)
-    except:
-        pass
-    
     if not not_initial:
         G = Graph()
         my_graph_output = G.draw(layout=layout_type,
@@ -199,11 +194,11 @@ def modify_graph(clickData,
             G.delete_edge(from_, to)
             
     elif 'vertex-button' in changed_id:
-        lc = LastClick()
         try:
             lc.deserialize(last_click)
         except:
             pass
+        
         if lc.x:
             G.add_node(x=lc.x, y=lc.y)
             lc.x = None
