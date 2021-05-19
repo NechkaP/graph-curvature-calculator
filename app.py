@@ -21,6 +21,7 @@ import plotly.graph_objs as go
 from graph import *
 from Math import *
 from index import *
+from serialize import *
 
 
 class LastClick:
@@ -56,10 +57,11 @@ app.layout = LAYOUT
 @app.callback(
     [Output('graph-store', 'data'),
      Output('my-graph', 'figure'),
-     Output('is-fixed-pos', 'data'),
-     Output('initial', 'data')
+     Output('initial', 'data'),
+     Output('last-click', 'data')
     ],
     [Input('my-graph', 'selectedData'),
+    Input('my-graph', 'clickData'),
     Input('layout-type', 'value'),
     Input('colortheme', 'value'),
     Input('matrix-input', 'value'),
@@ -79,11 +81,11 @@ app.layout = LAYOUT
     State('last-click', 'data'),
     State('my-graph', 'figure'),
     State('upload-data', 'filename'),
-    State('initial', 'data'),
-    #State('is-fixed-pos', 'data')
+    State('initial', 'data')
     ]
 )
 def modify_graph(clickData,
+                lastClickData,
                 layout_type,
                 color,
                 matrix,
@@ -101,9 +103,14 @@ def modify_graph(clickData,
                 last_click,
                 figure, 
                 filename,
-                not_initial,
-                #is_fixed_output='True'
+                not_initial
                 ):
+    
+    lc = LastClick()
+    try:
+        lc.deserialize(last_click)
+    except:
+        pass
     
     if not not_initial:
         G = Graph()
@@ -113,10 +120,10 @@ def modify_graph(clickData,
                           weighted=False)
         return [json.dumps(G, cls=MyJSONEncoder),
                 my_graph_output,
-                'True',
-                'not initial']
+                'not initial',
+                lc.serialize()]
     graph_store_output = graph_state
-    my_graph_output = figure
+    my_graph_output = None
     #is_fixed = (is_fixed_output == 'True')
     
     changed_id = [p['prop_id'] for p in dash.callback_context.triggered][0]
@@ -134,7 +141,6 @@ def modify_graph(clickData,
                           fixed_pos=False,
                           weighted=weighted,
                           idleness=idleness)
-        return [graph_store_output, my_graph_output, 'False', 'not initial']
     
     elif 'colortheme' in changed_id:
         if color != None and 'D' in color:
@@ -147,6 +153,7 @@ def modify_graph(clickData,
         G.selected = []
         for n in G.nodes:
             n.selected = False
+            
         if clickData and clickData['points']:
             for item in clickData['points']:
                 curve_number = item['curveNumber']
@@ -155,11 +162,21 @@ def modify_graph(clickData,
                     G.selected.append(name)
                     if len(G.selected) > 2:
                         G.selected = G.selected[-2:]
-                elif name == 'HEATMAP':
+        
+        elif lastClickData and lastClickData['points']:
+            for item in lastClickData['points']:
+                curve_number = item['curveNumber']
+                name = figure['data'][curve_number]['name']
+                if name == 'HEATMAP':
                     G.selected = []
-                    break
+                    lc = LastClick(x=int(lastClickData['points'][0]['x']),
+                                   y=int(lastClickData['points'][0]['y']))
+                else:
+                    lc = LastClick()
+        
         for name in G.selected:
             G.nodes[int(name)].selected = True
+            
             
     elif 'edge-button' in changed_id:
         weight = 1.0
@@ -183,7 +200,6 @@ def modify_graph(clickData,
             
     elif 'vertex-button' in changed_id:
         lc = LastClick()
-        print('last click =', last_click)
         try:
             lc.deserialize(last_click)
         except:
@@ -194,7 +210,11 @@ def modify_graph(clickData,
             lc.y = None
         else:
             G.add_node()
-        print(G.nodes[-1])
+            my_graph_output = G.draw(layout=layout_type,
+                              curvature_type=curvature_type,
+                              fixed_pos=False,
+                              weighted=weighted,
+                              idleness=idleness)
             
     elif 'vertex-delete-button' in changed_id:
         if len(G.selected) > 0:
@@ -209,16 +229,31 @@ def modify_graph(clickData,
     elif 'matrix-input' in changed_id:
         G.nodes.clear()
         G.edges.clear()
-        nums = list(map(float, matrix.replace(']', '').replace('[', '').replace(',', ' ').split()))
+        nums = []
+        try:
+            nums = list(map(float, matrix.replace(']', '').replace('[', '').replace(',', ' ').split()))
+        except:
+            pass
         N = int(np.sqrt(len(nums)))
         G.M = np.zeros(shape = (N, N), dtype = float)
         G.DM = np.zeros(shape = (N, N), dtype = float)
-        for i in range(N):
-            G.add_node(node_id=i, resize=False)
-        for i in range(N):
-            for j in range(N):
-                if nums[i * N + j]:
-                    G.add_edge(from_node=i, to_node=j)
+        if N * N != len(nums):
+            pass
+        else:
+            for i in range(N):
+                for j in range(N):
+                    if nums[i * N + j] < 0.0:
+                        break
+                    else:
+                        G.M[i][j] = nums[i * N + j]
+                        G.M[j][i] = nums[i * N + j]
+                        G.DM[i][j] = nums[i * N + j]
+            for i in range(N):
+                G.add_node(node_id=i, resize=False)
+            for i in range(N):
+                for j in range(N):
+                    if nums[i * N + j]:
+                        G.add_edge(from_node=i, to_node=j, weight=nums[i*N + j])
                 
 
     elif 'upload-data' in changed_id:
@@ -240,13 +275,22 @@ def modify_graph(clickData,
             #df = pd.read_csv(
             #    io.StringIO(decoded.decode('utf-8')))
     graph_store_output = json.dumps(G, cls=MyJSONEncoder)
-    my_graph_output = G.draw(layout=layout_type,
-                          curvature_type=curvature_type,
-                          fixed_pos=True,
-                          weighted=weighted,
-                          idleness=idleness)
+    if not my_graph_output:
+        if curvature_type == 'directed':
+            my_graph_output = G.draw(layout=layout_type,
+                              curvature_type=curvature_type,
+                              fixed_pos=True,
+                              directed=True,
+                              weighted=weighted,
+                              idleness=idleness)
+        else:
+            my_graph_output = G.draw(layout=layout_type,
+                                  curvature_type=curvature_type,
+                                  fixed_pos=True,
+                                  weighted=weighted,
+                                  idleness=idleness)
     
-    return [graph_store_output, my_graph_output, 'True', 'not initial']
+    return [graph_store_output, my_graph_output, 'not initial', lc.serialize()]
             
 
 @app.callback(
@@ -258,26 +302,6 @@ def confirm_delete(submit_n_clicks):
     if not submit_n_clicks:
         return ''
     return submit_n_clicks
-    
-
-@app.callback(
-    Output('last-click', 'data'),
-    Input('my-graph', 'clickData'),
-    State('my-graph', 'figure'),
-    prevent_initial_call=True
-    )
-def click_processing(clickData, figure):
-    if clickData is None or clickData['points'] == []:
-        return ''
-    curve = clickData['points'][0]['curveNumber']
-    name = figure['data'][curve]['name']
-    if name == 'HEATMAP':
-        lc = LastClick(x=int(clickData['points'][0]['x']),
-                       y=int(clickData['points'][0]['y']))
-    else:
-        lc = LastClick()
-    print(lc.serialize())
-    return lc.serialize()
 
 
 @app.callback(
@@ -326,7 +350,27 @@ def validate_and_display_warning(edge_weight, idleness_input, matrix, cur_idlene
                         warning = 'Edge weight should be a real non-negative number. Setting the next edge weight to 1.0...'
                 except:
                     pass
+                
+    elif 'matrix-input' in changed_id:
+        nums = []
+        try:
+            nums = list(map(float, matrix.replace(']', '').replace('[', '').replace(',', ' ').split()))
+        except:
+            warning = 'Incorrect input matrix. Please check if it contains only non-negative real numbers, commas and brackets.'
     
+        N = int(np.sqrt(len(nums)))
+        M = np.zeros(shape=(N, N), dtype=float)
+        if N * N != len(nums):
+            warning = 'Incorrect input. Please check if it is a square matrix'
+        elif N == 0:
+            warning = 'Empty input.'
+        for i in range(N):
+            for j in range(N):
+                if nums[i * N + j] < 0.0:
+                    warning = 'Incorrect input matrix. Please check if it contains only non-negative real numbers, commas and brackets.'
+                else:
+                    M[i][j] = nums[i * N + j]
+                    
     return [warning, idleness]
 
 
