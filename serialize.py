@@ -1,4 +1,6 @@
 #serialize.py
+import json
+from Graph import *
 
 class MyJSONEncoder(json.JSONEncoder):
     def default(self, obj):
