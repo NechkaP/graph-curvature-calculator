@@ -1,6 +1,8 @@
 #serialize.py
 import json
+
 from graph import *
+from hypergraph import *
 
 class MyJSONEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -8,13 +10,30 @@ class MyJSONEncoder(json.JSONEncoder):
             dct = obj.__dict__.copy()
             dct.pop('edges', None)
             dct.pop('trace_recode', None)
-            print('GRAPH ENCODE', dct)
+            return dct
+        elif isinstance(obj, HyperGraph):
+            dct = obj.__dict__.copy()
+            dct.pop('trace_recode', None)
             return dct
         elif isinstance(obj, Node):
-            obj.__dict__.pop('edges_in', None)
-            obj.__dict__.pop('edges_out', None)
-            obj.__dict__.pop('trace', None)
-            return obj.__dict__
+            dct = obj.__dict__.copy()
+            dct.pop('edges_in', None)
+            dct.pop('edges_out', None)
+            dct.pop('trace', None)
+            return dct
+        elif isinstance(obj, HyperNode):
+            dct = obj.__dict__.copy()
+            dct.pop('trace')
+            dct.pop('hyperedges')
+            dct['hyperedges'] = list(obj.__dict__['hyperedges'])
+            return dct
+        elif isinstance(obj, HyperEdge):
+            dct = obj.__dict__.copy()
+            dct.pop('trace')
+            dct.pop('middle_hover_trace')
+            dct.pop('hypernodes')
+            dct['hypernodes'] = list(obj.__dict__['hypernodes'])
+            return dct
         elif isinstance(obj, nx.Graph):
             return {'name': 'nx.Graph', 'data': nx.adjacency_data(obj)}
         elif isinstance(obj, nx.DiGraph):
@@ -23,8 +42,7 @@ class MyJSONEncoder(json.JSONEncoder):
             return {'name': 'np.array', 'data': obj.tolist()}
         elif isinstance(obj, list):
             return [MyJSONEncoder.default(self, x) for x in obj]
-        else:
-            return json.JSONEncoder.default(self, obj)
+        return json.JSONEncoder.default(self, obj)
 
 
 def MyJSONDecode(dct):
@@ -39,6 +57,5 @@ def MyJSONDecode(dct):
             return nx.adjacency_graph(dct['data'], directed=True)
         elif name == 'np.array':
             return np.array(dct['data'])
-        else:
-            return getattr(modules[__name__], name)(**dct)
+        return getattr(modules[__name__], name)(**dct)
     return dct

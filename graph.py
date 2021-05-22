@@ -14,7 +14,7 @@ import networkx as nx
 import plotly.graph_objs as go
 
 from sys import stderr, modules
-
+#
 from Math import *
 
 def color(curv_value, Dark):
@@ -22,7 +22,7 @@ def color(curv_value, Dark):
         if curv_value < 0:
             return 'Aquamarine'
         elif curv_value == 0:
-            return 'LightCyan'
+            return 'DimGray'
         else:
             return 'Tomato'
     else:
@@ -199,7 +199,7 @@ class Graph:
             K = curvature_dir(self.DM)
         elif curvature_type == 'ollivier':
             K = curvature(self.M)
-        return K
+        return np.round(K, 3)
 
         
     def add_edge(self, from_node, to_node, weight=1.0, curvature=0.0):
@@ -308,7 +308,10 @@ class Graph:
             if layout=='spring':
                 self.pos = nx.spring_layout(self.G)
             elif layout=='random':
-                self.pos = nx.random_layout(self.G, center=[0,0])
+                self.pos = nx.random_layout(self.G, center=[-0.5,-0.5])
+                for item in self.pos.keys():
+                    self.pos[item] *= 2
+                    
             elif layout=='planar':
                 self.pos = nx.planar_layout(self.G)
             elif layout=='shell':
@@ -320,7 +323,9 @@ class Graph:
             if layout=='spring':
                 self.dpos = nx.spring_layout(self.DG)
             elif layout=='random':
-                self.dpos = nx.random_layout(self.DG, center=[0,0])
+                self.dpos = nx.random_layout(self.DG, center=[-0.5,-0.5])
+                for item in self.pos.keys():
+                    self.pos[item] *= 2
             elif layout=='planar':
                 self.dpos = nx.planar_layout(self.DG)
             elif layout=='shell':
