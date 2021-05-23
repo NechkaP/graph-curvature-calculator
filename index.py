@@ -42,7 +42,16 @@ MARKDOWN_DESCRIPTION = \
 ### What is curvature?
 Consider two very close points $x$, $y$ in a Riemannian manifold defining a tangent vector at $x$. Let $w$ be another tangent vector, and $w'$ be the tangent vector at $y$ parallel to $w$ at $x$. Following the geodesics issuing from $x$ in direction $w$ and from $y$ in direction $w'$, the geodesics will get closer in the case of positive curvature. Ricci curvature along $(xy)$ is this phenomenon, averaged in all directions $w$ at $x$.
 ### How can this information about graphs and hypergraphs be used?
-Data about graphs, which can be calculated using it, can be used in data analysis for studying network structures in the brain components. It was shown that a correlation betweenbrain diseases and curvature of the connectome graph might exist and should be examined more profoundly using machine learning methods."""
+Data about graphs, which can be calculated using it, can be used in data analysis for studying network structures in the brain components. It was shown that a correlation betweenbrain diseases and curvature of the connectome graph might exist and should be examined more profoundly using machine learning methods.
+### How to use the calculator?
+* Start with clicking on the button "Add vertex" or on the field to choose a certain place for it.
+* To add an edge, use Rectangle or Lasso on the top-right of plot, choose vertices and then use the "Add edge" button.
+* To remove an element, use Rectangle or Lasso and then the corresponding button.
+* To calculate curvature, use the dropdown list on top-left to choose its type, and the graph will be automatically modified (red corresponds to positive values, blue -- to negative, and edges' opacity and vertices' size is proportional to curvature's absolute value.)
+* To clear the whole field, press "Clear all" button. You will see a pop-up warning before the graph is lost :)
+* You can choose one of layout algorithms in a dropdown list on the right
+* Almost everything is the same for hypergraphs, but to add an edge you can select any (including zero) number of vertices before pressing the button. For deleting a hyperedge, you will have to select the whole set of its hypervertices again. You can modify the hyperedges without adding them again using buttons "Add connection" and "Delete connection", selecting one vertex and one edge.
+"""
 
 HELP_ABOUT = convert(MARKDOWN_DESCRIPTION)
 
